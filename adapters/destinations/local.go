@@ -11,6 +11,14 @@ type LocalAdapter struct {
 	BaseDir string
 }
 
+type LocalConfig struct {
+	BaseDir string `json:"base_dir"`
+}
+
+func NewLocalAdapter(cfg LocalConfig) *LocalAdapter {
+	return &LocalAdapter{BaseDir: cfg.BaseDir}
+}
+
 func (l *LocalAdapter) Store(srcPath string) (string, error) {
 	filename := filepath.Base(srcPath)
 	destPath := filepath.Join(l.BaseDir, filename)

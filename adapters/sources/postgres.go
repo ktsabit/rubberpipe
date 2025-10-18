@@ -19,6 +19,26 @@ type PostgresAdapter struct {
 	BackupDir string
 }
 
+type PostgresConfig struct {
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	User      string `json:"user"`
+	Password  string `json:"password"`
+	DBName    string `json:"dbname"`
+	BackupDir string `json:"backup_dir"`
+}
+
+func NewPostgresAdapter(cfg PostgresConfig) *PostgresAdapter {
+	return &PostgresAdapter{
+		Host:      cfg.Host,
+		Port:      cfg.Port,
+		User:      cfg.User,
+		Password:  cfg.Password,
+		DBName:    cfg.DBName,
+		BackupDir: cfg.BackupDir,
+	}
+}
+
 func (p *PostgresAdapter) Backup() (string, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	backupFile := fmt.Sprintf("%s/%s.dump", p.BackupDir, timestamp)

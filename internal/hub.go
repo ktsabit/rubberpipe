@@ -2,6 +2,8 @@
 package internal
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rubberpipe/rubberpipe/adapters/destinations"
@@ -22,30 +24,37 @@ type Hub struct {
 	Destinations map[string]DestinationAdapter
 }
 
-func NewHub() *Hub {
-	postgres := &sources.PostgresAdapter{
-		Host:      "localhost",
-		Port:      5432,
-		User:      "postgres",
-		Password:  "pass",
-		DBName:    "rubberpipe_test",
-		BackupDir: "/tmp/rubberpipe",
+func NewHub(db *sql.DB) (*Hub, error) {
+	hub := &Hub{
+		Sources:      make(map[string]SourceAdapter),
+		Destinations: make(map[string]DestinationAdapter),
 	}
 
-	local := &destinations.LocalAdapter{
-		BaseDir: "backups",
+	rows, err := db.Query(`SELECT name, type, config_json FROM adapter_configs`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, typ, cfgJSON string
+		_ = rows.Scan(&name, &typ, &cfgJSON)
+
+		switch typ {
+		case "postgres":
+			var cfg sources.PostgresConfig
+			json.Unmarshal([]byte(cfgJSON), &cfg)
+			hub.Sources[name] = sources.NewPostgresAdapter(cfg)
+
+		case "local":
+			var cfg destinations.LocalConfig
+			json.Unmarshal([]byte(cfgJSON), &cfg)
+			hub.Destinations[name] = destinations.NewLocalAdapter(cfg)
+		}
 	}
 
-	return &Hub{
-		Sources: map[string]SourceAdapter{
-			"postgres": postgres,
-		},
-		Destinations: map[string]DestinationAdapter{
-			"local": local,
-		},
-	}
+	return hub, nil
 }
-
 func (h *Hub) Backup(sourceName, destName string) (string, error) {
 	src, ok := h.Sources[sourceName]
 	if !ok {
