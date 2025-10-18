@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rubberpipe/rubberpipe/internal"
@@ -67,6 +68,25 @@ func main() {
 		} else {
 			_ = internal.LogBackup(db, source, dest, file, "success", "")
 			fmt.Println("Backup successful:", file)
+		}
+
+	case "restore":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: rubberpipe restore <backup_id>")
+			return
+		}
+		backupIdString := os.Args[2]
+
+		backupId, err := strconv.Atoi(backupIdString)
+		if err != nil {
+			fmt.Printf("Invalid backup_id: %v\n", err)
+			return
+		}
+
+		err = hub.Restore(backupId, db)
+
+		if err != nil {
+			fmt.Println("Restore failed:", err)
 		}
 
 	case "list":

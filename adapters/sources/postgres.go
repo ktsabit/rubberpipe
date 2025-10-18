@@ -74,3 +74,19 @@ func (p *PostgresAdapter) Validate() error {
 	defer db.Close()
 	return db.Ping()
 }
+
+func (p *PostgresAdapter) Restore(filePath string) error {
+	cmd := exec.Command(
+		"pg_restore",
+		"-h", p.Host,
+		"-p", fmt.Sprintf("%d", p.Port),
+		"-U", p.User,
+		"-d", p.DBName,
+		"-c", // clean before restore
+		filePath,
+	)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", p.Password))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}

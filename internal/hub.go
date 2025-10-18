@@ -13,10 +13,12 @@ import (
 type SourceAdapter interface {
 	Backup() (string, error)
 	Validate() error
+	Restore(string) error
 }
 
 type DestinationAdapter interface {
 	Store(srcPath string) (string, error)
+	Retrieve(string) (string, error)
 }
 
 type Hub struct {
@@ -55,6 +57,8 @@ func NewHub(db *sql.DB) (*Hub, error) {
 
 	return hub, nil
 }
+
+// Backup from source adapter to a temporary file to be then stored with dest adapter
 func (h *Hub) Backup(sourceName, destName string) (string, error) {
 	src, ok := h.Sources[sourceName]
 	if !ok {
@@ -80,6 +84,37 @@ func (h *Hub) Backup(sourceName, destName string) (string, error) {
 		return "", fmt.Errorf("storing backup failed: %w", err)
 	}
 
-	fmt.Println("Backup successful:", storedPath)
 	return storedPath, nil
+}
+
+func (h *Hub) Restore(backupID int, db *sql.DB) error {
+	// Query backup record
+	var srcName, destName, file string
+	err := db.QueryRow("SELECT source, destination, filename FROM backups WHERE id = ?", backupID).
+		Scan(&srcName, &destName, &file)
+	if err != nil {
+		return fmt.Errorf("backup not found: %w", err)
+	}
+
+	src, ok := h.Sources[srcName]
+	if !ok {
+		return fmt.Errorf("source adapter %s not found", srcName)
+	}
+
+	dest, ok := h.Destinations[destName]
+	if !ok {
+		return fmt.Errorf("destination adapter %s not found", destName)
+	}
+
+	localFile, err := dest.Retrieve(file)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve backup: %w", err)
+	}
+
+	if err := src.Restore(localFile); err != nil {
+		return fmt.Errorf("restore failed: %w", err)
+	}
+
+	fmt.Println("Restore successful:", backupID)
+	return nil
 }

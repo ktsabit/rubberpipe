@@ -44,5 +44,13 @@ func (l *LocalAdapter) Store(srcPath string) (string, error) {
 		return "", fmt.Errorf("failed to copy data: %w", err)
 	}
 
-	return destPath, nil
+	return filename, nil
+}
+
+func (l *LocalAdapter) Retrieve(fileName string) (string, error) {
+	path := filepath.Join(l.BaseDir, fileName)
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("file not found: %w", err)
+	}
+	return path, nil
 }
