@@ -2,12 +2,14 @@ package sources
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/rubberpipe/rubberpipe/internal"
 )
 
 type PostgresAdapter struct {
@@ -39,6 +41,18 @@ func NewPostgresAdapter(cfg PostgresConfig) *PostgresAdapter {
 	}
 }
 
+func PostgresAdapterFactory(configJSON string) (internal.SourceAdapter, error) {
+	var cfg PostgresConfig
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return nil, fmt.Errorf("invalid Postgres config JSON: %w", err)
+	}
+	return NewPostgresAdapter(cfg), nil
+}
+
+func init() {
+	internal.RegisterSourceAdapter("postgres", PostgresAdapterFactory)
+}
+
 func (p *PostgresAdapter) Backup() (string, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	backupFile := fmt.Sprintf("%s/%s.dump", p.BackupDir, timestamp)
@@ -52,6 +66,7 @@ func (p *PostgresAdapter) Backup() (string, error) {
 		"-f", backupFile,
 		p.DBName,
 	)
+
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", p.Password))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

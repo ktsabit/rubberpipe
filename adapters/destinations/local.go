@@ -1,10 +1,13 @@
 package destinations
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/rubberpipe/rubberpipe/internal"
 )
 
 type LocalAdapter struct {
@@ -17,6 +20,18 @@ type LocalConfig struct {
 
 func NewLocalAdapter(cfg LocalConfig) *LocalAdapter {
 	return &LocalAdapter{BaseDir: cfg.BaseDir}
+}
+
+func LocalAdapterFactory(configJSON string) (internal.DestinationAdapter, error) {
+	var cfg LocalConfig
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return nil, fmt.Errorf("invalid Local config JSON: %w", err)
+	}
+	return NewLocalAdapter(cfg), nil
+}
+
+func init() {
+	internal.RegisterDestinationAdapter("local", LocalAdapterFactory)
 }
 
 func (l *LocalAdapter) Store(srcPath string) (string, error) {

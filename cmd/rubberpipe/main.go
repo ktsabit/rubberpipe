@@ -10,12 +10,16 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rubberpipe/rubberpipe/internal"
+
+	_ "github.com/rubberpipe/rubberpipe/adapters/destinations"
+	_ "github.com/rubberpipe/rubberpipe/adapters/sources"
 )
 
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: rubberpipe <command> [args...]")
-		fmt.Println("Commands: backup, list, config")
+		fmt.Println("Commands: backup, restore, list, config")
+
 		return
 	}
 

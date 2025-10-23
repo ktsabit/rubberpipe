@@ -3,11 +3,7 @@ package internal
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-
-	"github.com/rubberpipe/rubberpipe/adapters/destinations"
-	"github.com/rubberpipe/rubberpipe/adapters/sources"
 )
 
 type SourceAdapter interface {
@@ -19,6 +15,27 @@ type SourceAdapter interface {
 type DestinationAdapter interface {
 	Store(srcPath string) (string, error)
 	Retrieve(string) (string, error)
+}
+
+// Function signatures for creating a Adapter from config JSON
+type SourceFactory func(configJSON string) (SourceAdapter, error)
+type DestinationFactory func(configJSON string) (DestinationAdapter, error)
+
+var sourceFactories = make(map[string]SourceFactory)
+var destinationFactories = make(map[string]DestinationFactory)
+
+func RegisterSourceAdapter(typ string, factory SourceFactory) {
+	if _, exists := sourceFactories[typ]; exists {
+		panic(fmt.Sprintf("Source adapter type '%s' already registered", typ))
+	}
+	sourceFactories[typ] = factory
+}
+
+func RegisterDestinationAdapter(typ string, factory DestinationFactory) {
+	if _, exists := destinationFactories[typ]; exists {
+		panic(fmt.Sprintf("Destination adapter type '%s' already registered", typ))
+	}
+	destinationFactories[typ] = factory
 }
 
 type Hub struct {
@@ -42,17 +59,28 @@ func NewHub(db *sql.DB) (*Hub, error) {
 		var name, typ, cfgJSON string
 		_ = rows.Scan(&name, &typ, &cfgJSON)
 
-		switch typ {
-		case "postgres":
-			var cfg sources.PostgresConfig
-			json.Unmarshal([]byte(cfgJSON), &cfg)
-			hub.Sources[name] = sources.NewPostgresAdapter(cfg)
-
-		case "local":
-			var cfg destinations.LocalConfig
-			json.Unmarshal([]byte(cfgJSON), &cfg)
-			hub.Destinations[name] = destinations.NewLocalAdapter(cfg)
+		// 1. Look up the factory in the Source registry
+		if factory, ok := sourceFactories[typ]; ok {
+			adapter, err := factory(cfgJSON)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load source adapter '%s' of type '%s': %w", name, typ, err)
+			}
+			hub.Sources[name] = adapter
+			continue
 		}
+
+		// 2. Look up the factory in the Destination registry
+		if factory, ok := destinationFactories[typ]; ok {
+			adapter, err := factory(cfgJSON)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load destination adapter '%s' of type '%s': %w", name, typ, err)
+			}
+			hub.Destinations[name] = adapter
+			continue
+		}
+
+		// If execution reaches here, the type is unknown
+		return nil, fmt.Errorf("unknown adapter type '%s' for config '%s'. Has the package been imported?", typ, name)
 	}
 
 	return hub, nil
